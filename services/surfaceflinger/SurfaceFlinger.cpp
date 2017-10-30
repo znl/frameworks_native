@@ -4216,20 +4216,34 @@ void SurfaceFlinger::repaintEverything() {
 
 // Checks that the requested width and height are valid and updates them to the display dimensions
 // if they are set to 0
-static status_t updateDimensionsLocked(const sp<const DisplayDevice>& displayDevice,
-                                       Transform::orientation_flags rotation,
-                                       uint32_t* requestedWidth, uint32_t* requestedHeight,
-                                       int hwOrientation) {
+status_t SurfaceFlinger::updateDimensionsLocked(const sp<const DisplayDevice>& displayDevice,
+                                       Transform::orientation_flags* rotation,
+                                       int32_t hardwareRotation,
+                                       uint32_t* requestedWidth, uint32_t* requestedHeight) {
     // get screen geometry
     uint32_t displayWidth = displayDevice->getWidth();
     uint32_t displayHeight = displayDevice->getHeight();
 
-    if (hwOrientation & DisplayState::eOrientationSwapMask) {
-        std::swap(displayWidth, displayHeight);
+    if (displayDevice->getDisplayType() == DisplayDevice::DISPLAY_PRIMARY) {
+        const auto& activeConfig = mHwc->getActiveConfig(HWC_DISPLAY_PRIMARY);
+        displayWidth = activeConfig->getWidth();
+        displayHeight = activeConfig->getHeight();
     }
 
-    if (rotation & Transform::ROT_90) {
-        std::swap(displayWidth, displayHeight);
+    switch ((convertRotation(*rotation) + hardwareRotation) % 4) {
+        case 1:
+            std::swap(displayWidth, displayHeight);
+            *rotation = Transform::ROT_90;
+            break;
+        case 2:
+            *rotation = Transform::ROT_180;
+            break;
+        case 3:
+            std::swap(displayWidth, displayHeight);
+            *rotation = Transform::ROT_270;
+            break;
+        default:
+            break;
     }
 
     if (*requestedWidth == 0) {
